@@ -48,7 +48,9 @@ func Worker(mapf func(string, string) []KeyValue,
 		//tasktype will be decided by the coordinator
 		task := TaskReply{}
 		args := TaskArgs{}
+		fmt.Println(args)
 		ok := call("Coordinator.HandleWorker", &args, &task)
+		//fmt.Printf("task:%s\n", task.TaskType)
 		if !ok {
 			fmt.Printf("call failed!\n")
 		}

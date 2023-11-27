@@ -73,6 +73,7 @@ func (c *Coordinator) FinishedReduce(args *TaskArgs, reply *TaskReply) error {
 
 func (c *Coordinator) HandleWorker(args *TaskArgs, reply *TaskReply) error {
 	mutex.Lock()
+	defer mutex.Unlock()
 	//give maptask
 	if c.mapfinished < c.nMap {
 		id := -1
@@ -84,7 +85,6 @@ func (c *Coordinator) HandleWorker(args *TaskArgs, reply *TaskReply) error {
 		}
 		if id == -1 {
 			reply.TaskType = "waiting"
-			mutex.Unlock()
 		} else {
 			reply.TaskType = "map"
 			reply.NReduce = c.nReduce
@@ -92,14 +92,14 @@ func (c *Coordinator) HandleWorker(args *TaskArgs, reply *TaskReply) error {
 			c.maptaskstatus[id] = 1 //waiting
 			filename := c.files[id]
 			reply.FileName = filename
-			mutex.Unlock()
 
 			go c.asyncCheck(t, id, "map")
-			mutex.Unlock()
+
 		}
 
 		//map finished, give reducetask
 	} else if c.mapfinished == c.nMap && c.reducefinished < c.nReduce {
+
 		id := -1
 		for i := 0; i < c.nReduce; i++ {
 			if c.reducetaskstatus[i] == 0 { //not allocated
@@ -109,38 +109,36 @@ func (c *Coordinator) HandleWorker(args *TaskArgs, reply *TaskReply) error {
 		}
 		if id == -1 {
 			reply.TaskType = "waiting"
-			mutex.Unlock()
 		} else {
 			reply.NMap = c.nMap
 			reply.TaskType = "reduce"
 			reply.Reducetasknum = id
 			c.reducetaskstatus[id] = 1 //waiting
-			mutex.Unlock()
 
 			go c.asyncCheck(t, id, "reduce")
-			mutex.Unlock()
+
 		}
 	} else {
 		reply.TaskType = "done"
-		mutex.Unlock()
 	}
 	return nil
 }
 
 func (c *Coordinator) asyncCheck(sleepSeconds int, id int, stage string) {
 	time.Sleep(time.Duration(sleepSeconds) * time.Second)
+	mutex.Lock()
+	defer mutex.Unlock()
 
 	switch coordStage := stage; coordStage {
 
 	case "map":
-		mutex.Lock()
 		if c.maptaskstatus[id] == 1 { //waiting
 			c.maptaskstatus[id] = 0 //not allocated
 			break
 		}
 
 	case "reduce":
-		mutex.Lock()
+
 		if c.reducetaskstatus[id] == 1 { //waiting
 			c.reducetaskstatus[id] = 0 //not allocated
 			break
